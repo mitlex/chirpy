@@ -1,33 +1,81 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"sync/atomic"
 )
+
+// apiConfig will hold any stateful in-memory data that needs tracking
+type apiConfig struct {
+	fileserverHits atomic.Int32 // tracks how many requests are made to our website - this type allows safe incrementing and reading of an integer value across multiple goroutines (HTTP requests)
+}
+
+// middlewareMetricsInc increments the fileserverHits counter every time middlewareMetricsInc is called
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg.fileserverHits.Add(1)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// handlerDisplaySiteHits writes the number of requests that have been counted as plain text to the HTTP response
+func (cfg *apiConfig) handlerDisplaySiteHits(w http.ResponseWriter, r *http.Request) {
+	hits := fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load()) // .Load() safely reads the fileserverHits counter current value
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(hits))
+}
+
+// handlerResetSiteHits resets the fileserverHits back to 0
+func (cfg *apiConfig) handlerResetSiteHits(w http.ResponseWriter, r *http.Request) {
+	cfg.fileserverHits.Swap(0)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+}
 
 func main() {
 
-	// create new http.ServeMux to route requests
+	// Create new http.ServeMux to route requests
 	httpReqRouter := http.NewServeMux()
 
-	// Register handlers for requests
+	// Instantiate apiConfig for stateful data tracking
+	apiCfg := apiConfig{
+		fileserverHits: atomic.Int32{},
+	}
 
-	// FileServer
-	// WARNING: http.Dir(".") allows the handler to serve any file from the root directory
-	// 			Fine for this toy project, but better practice to create a dedicated public folder (i.e. http.Dir("public")) to place files we'd like to expose
-	// NOTE #1: FileServer will automatically serve index.html if present in the directory, OR, if not present, serves a listing of all files in the directory
-	// NOTE #2: http.Dir(filepathRoot) converts the string "." to an http.Dir type
-	// 			http.Dir implements the http.FileSystem interface, allowing http.FileServer to serve files from the current directory (root: .)
-	//			In other words, http.Dir tells the FileServer where on disk to look for files
-	// NOTE #3: StripPrefix strips `/app` from the URL path before FileServer looks for it on disk
-	// 			Example: URL request /app/assets/logo.png becomes /assets/logo.png which is where the logo.png file actually lives on disk (reminder: we don't have an /app folder on disk)
-	// 			This allows us to create a /app namespace that the httpReqRouter Mux can route /app URL traffic to, even though the FileServer is serving files from root (.) directory.
-	// 			If we continued to register the FileServer at "/" then any requests like /healthz would be routed to the FileServer as well, as "/" swallows all other requests like "/x", "/x/y"
+	// Register handlers for requests
+	// FileServer (/app/)
+	// WARNING: http.Dir(".") allows the handler to serve any file from the process's current working directory (.).
+	// 			Fine for this toy project, but better practice to create a dedicated public folder (i.e. http.Dir("public")) to place files we'd like to expose.
+	//
+	// NOTE #1: FileServer will automatically serve index.html if present in the directory, OR, if not present, serves a listing of all files in the directory.
+	//
+	// NOTE #2: http.Dir(filepathRoot) converts the string "." to an http.Dir type.
+	// 			http.Dir implements the http.FileSystem interface, allowing http.FileServer to serve files from the current working directory.
+	//			In other words, http.Dir tells the FileServer handler where on disk to look for files.
+	//
+	// NOTE #3: StripPrefix strips /app from the URL path before FileServer looks for it on disk.
+	//
+	// 			Example: URL request /app/assets/logo.png becomes /assets/logo.png which is where the logo.png file actually lives on disk (reminder: we don't have an /app folder on disk).
+	//
+	// 			This allows us to create an /app namespace that the httpReqRouter Mux can route /app/ URL traffic to, even though the FileServer is serving files from current working directory (e.g. root directory).
+	// 			If we continued to register the FileServer at "/" then any requests like /healthz would be routed to the FileServer as well, as "/" swallows all other requests like "/x", "/x/y".
+	//
+	// NOTE #4: We register "/app/" as the pattern so httpReqRouter routes the entire subtree
+	//         	of URLs (e.g. /app/index.html, /app/assets/logo.png) to the FileServer handler.
+	//          If we registered "/app" (no trailing slash), httpReqRouter would only match
+	//          the exact literal path "/app" — nothing nested underneath it would reach the FileServer handler.
+	//			Go can redirect /app to /app/ when "/app/" is registered.
 	const filepathRoot = "."
-	httpReqRouter.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	httpReqRouter.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))) // wrap FileServer to track # site requests
 
 	// Readiness endpoint (/healthz)
-	httpReqRouter.HandleFunc("/healthz", serverReadinessEndpoint)
+	// Notice how we register this pattern using HandleFunc instead of Handle - look at the parameter types that Handle accepts vs. HandleFunc
+	httpReqRouter.HandleFunc("/healthz", handlerReadinessEndpoint)
+	httpReqRouter.HandleFunc("/metrics", apiCfg.handlerDisplaySiteHits)
+	httpReqRouter.HandleFunc("/reset", apiCfg.handlerResetSiteHits)
 
 	// create http server
 	srv := &http.Server{
