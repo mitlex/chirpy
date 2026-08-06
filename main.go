@@ -46,7 +46,7 @@ func main() {
 	}
 
 	// Register handlers for requests
-	// FileServer (/app/)
+	// FileServer endpoint (/app/)
 	// WARNING: http.Dir(".") allows the handler to serve any file from the process's current working directory (.).
 	// 			Fine for this toy project, but better practice to create a dedicated public folder (i.e. http.Dir("public")) to place files we'd like to expose.
 	//
@@ -71,11 +71,11 @@ func main() {
 	const filepathRoot = "."
 	httpReqRouter.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))) // wrap FileServer to track # site requests
 
-	// Readiness endpoint (/healthz)
+	// API endpoints
 	// Notice how we register this pattern using HandleFunc instead of Handle - look at the parameter types that Handle accepts vs. HandleFunc
-	httpReqRouter.HandleFunc("GET /healthz", handlerReadinessEndpoint)              // /healthz only accepts GET requests, server should return 405 (method not allowed) response automatically if other method used
-	httpReqRouter.HandleFunc("GET /metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // /metrics only accepts GET requests
-	httpReqRouter.HandleFunc("POST /reset", apiCfg.handlerResetSiteHitsEndpoint)    // only accepts POST requests
+	httpReqRouter.HandleFunc("GET /api/healthz", handlerReadinessEndpoint)              // only accepts GET requests, server should return 405 (method not allowed) response automatically if other method used
+	httpReqRouter.HandleFunc("GET /api/metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // only accepts GET requests
+	httpReqRouter.HandleFunc("POST /api/reset", apiCfg.handlerResetSiteHitsEndpoint)    // only accepts POST requests
 
 	// create http server
 	srv := &http.Server{
