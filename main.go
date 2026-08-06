@@ -21,7 +21,7 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 }
 
 // handlerDisplaySiteHits writes the number of requests that have been counted as plain text to the HTTP response
-func (cfg *apiConfig) handlerDisplaySiteHits(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerDisplaySiteHitsEndpoint(w http.ResponseWriter, r *http.Request) {
 	hits := fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load()) // .Load() safely reads the fileserverHits counter current value
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -29,7 +29,7 @@ func (cfg *apiConfig) handlerDisplaySiteHits(w http.ResponseWriter, r *http.Requ
 }
 
 // handlerResetSiteHits resets the fileserverHits back to 0
-func (cfg *apiConfig) handlerResetSiteHits(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerResetSiteHitsEndpoint(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Swap(0)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -73,9 +73,9 @@ func main() {
 
 	// Readiness endpoint (/healthz)
 	// Notice how we register this pattern using HandleFunc instead of Handle - look at the parameter types that Handle accepts vs. HandleFunc
-	httpReqRouter.HandleFunc("/healthz", handlerReadinessEndpoint)
-	httpReqRouter.HandleFunc("/metrics", apiCfg.handlerDisplaySiteHits)
-	httpReqRouter.HandleFunc("/reset", apiCfg.handlerResetSiteHits)
+	httpReqRouter.HandleFunc("GET /healthz", handlerReadinessEndpoint)              // /healthz only accepts GET requests, server should return 405 (method not allowed) response automatically if other method used
+	httpReqRouter.HandleFunc("GET /metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // /metrics only accepts GET requests
+	httpReqRouter.HandleFunc("POST /reset", apiCfg.handlerResetSiteHitsEndpoint)    // only accepts POST requests
 
 	// create http server
 	srv := &http.Server{
