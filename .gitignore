@@ -45,6 +45,8 @@ $RECYCLE.BIN/
 *.swp                
 # "Swap" files: Similar to .swp; created when editing the same file twice   
 *.swo                 
+# REST Client for Visual Studio Code - this file contains HTTP requests for testing
+test.http
 
 # --- Local Environment Secrets ---
 # DANGER: NEVER commit this. Contains API keys and private credentials 

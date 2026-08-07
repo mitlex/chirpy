@@ -83,6 +83,7 @@ func main() {
 	httpReqRouter.HandleFunc("GET /api/healthz", handlerReadinessEndpoint)                // only accepts GET requests, server should return 405 (method not allowed) response automatically if other method used
 	httpReqRouter.HandleFunc("GET /admin/metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // only accepts GET requests
 	httpReqRouter.HandleFunc("POST /admin/reset", apiCfg.handlerResetSiteHitsEndpoint)    // only accepts POST requests
+	httpReqRouter.HandleFunc("POST /api/validate_chirp", handlerValidateChirpEndpoint)
 
 	// create http server
 	srv := &http.Server{
