@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // handlerValidateChirpEndpoint
@@ -27,10 +28,32 @@ func handlerValidateChirpEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Chirp is valid
-	err = respondWithJSON(w, 200, map[string]bool{"valid": true})
+	// apply profanity filter to chirp
+	params.Body = profanityFilter(params.Body)
+
+	// respond with chirp
+	err = respondWithJSON(w, 200, map[string]string{"cleaned_body": params.Body})
 	if err != nil {
 		respondWithError(w, 500, "Server error occurred", err)
 		return
 	}
+}
+
+// profanityFilter takes a chirp and replaces any of the following words with ****:
+// kerfuffle, sharbert, fornax
+// returns the profanity-filtered chirp
+func profanityFilter(s string) string {
+	clean_words := []string{}
+	words := strings.Split(s, " ")
+	for _, word := range words {
+		originalWord := word
+		lowercaseWord := strings.ToLower(word)
+		if lowercaseWord == "kerfuffle" || lowercaseWord == "sharbert" || lowercaseWord == "fornax" {
+			clean_words = append(clean_words, "****")
+		} else {
+			clean_words = append(clean_words, originalWord)
+		}
+	}
+	result := strings.Join(clean_words, " ")
+	return result
 }
