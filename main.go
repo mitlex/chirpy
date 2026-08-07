@@ -1,15 +1,22 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq" // we must import this postgres driver even though we don't use it in our code - it's just being imported for "side effects" such that our program knows how to talk to our database
+	"github.com/mitlex/chirpy/internal/database"
 )
 
 // apiConfig will hold any stateful in-memory data that needs tracking
 type apiConfig struct {
-	fileserverHits atomic.Int32 // tracks how many requests are made to our website - this type allows safe incrementing and reading of an integer value across multiple goroutines (HTTP requests)
+	fileserverHits atomic.Int32      // tracks how many requests are made to our website - this type allows safe incrementing and reading of an integer value across multiple goroutines (HTTP requests)
+	queries        *database.Queries // to give handlers access to database queries
 }
 
 // middlewareMetricsInc increments the fileserverHits counter every time middlewareMetricsInc is called
@@ -43,13 +50,24 @@ func (cfg *apiConfig) handlerResetSiteHitsEndpoint(w http.ResponseWriter, r *htt
 }
 
 func main() {
+	godotenv.Load() // load .env file into environment variables
 
-	// Create new http.ServeMux to route requests
-	httpReqRouter := http.NewServeMux()
+	dbUrl := os.Getenv("DB_URL") // get database URL from environment
+
+	// open connection to database
+	db, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dbQueries := database.New(db)
+
+	httpReqRouter := http.NewServeMux() // Create new http.ServeMux to route requests
 
 	// Instantiate apiConfig for stateful data tracking
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
+		queries:        dbQueries,
 	}
 
 	// Register handlers for requests
@@ -68,7 +86,8 @@ func main() {
 	// 			Example: URL request /app/assets/logo.png becomes /assets/logo.png which is where the logo.png file actually lives on disk (reminder: we don't have an /app folder on disk).
 	//
 	// 			This allows us to create an /app namespace that the httpReqRouter Mux can route /app/ URL traffic to, even though the FileServer is serving files from current working directory (e.g. root directory).
-	// 			If we continued to register the FileServer at "/" then any requests like /healthz would be routed to the FileServer as well, as "/" swallows all other requests like "/x", "/x/y".
+	// 			If we continued to register the FileServer at "/" then any unregisted request paths like /xyz would be routed to the FileServer as well,
+	// 			be processed by the FileServer logic, which would look for a file xyz, would not find it, and then return a 404 error.
 	//
 	// NOTE #4: We register "/app/" as the pattern so httpReqRouter routes the entire subtree
 	//         	of URLs (e.g. /app/index.html, /app/assets/logo.png) to the FileServer handler.
@@ -94,7 +113,7 @@ func main() {
 	// start the server, listening on Addr (:8080)
 	// only returns error when it stops or fails to start
 	// it blocks the goroutine (main) it's running in for the life of the server hence we place it at the end of our main func
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatal(err) // this also calls os.Exit(1) terminating the program immediately; if server can't run, nothing left for main to do
 	}

@@ -1,0 +1,8 @@
+version: "2"
+sql:
+  - schema: "sql/schema" # tells SQLC to look in sql/schema directory for our schema structure (same files that Goose uses for migrations, but sqlc auto ignores 'down' migrations)
+    queries: "sql/queries" # tells SQLC to look in sql/queries directory for queries
+    engine: "postgresql"
+    gen:
+      go:
+        out: "internal/database" # tells SQLC to generate Go code in the internal/database directory
