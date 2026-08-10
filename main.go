@@ -114,6 +114,7 @@ func main() {
 	httpReqRouter.HandleFunc("GET /admin/metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // only accepts GET requests
 	httpReqRouter.HandleFunc("POST /admin/reset", apiCfg.handlerResetEndpoint)            // only accepts POST requests
 	httpReqRouter.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
+	httpReqRouter.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
 	httpReqRouter.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
 	// create http server
