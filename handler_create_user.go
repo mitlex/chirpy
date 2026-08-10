@@ -31,7 +31,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	reqParams := reqParameters{}
 	err := decoder.Decode(&reqParams) // any missing fields in the request body JSON will have their struct values set to their zero value
 	if err != nil {                   // error usually occurs due to JSON having wrong types or being invalid
-		respondWithError(w, 500, "Something went wrong", err)
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
 
@@ -39,7 +39,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	var newDbUser database.User
 	newDbUser, err = cfg.db.CreateUser(r.Context(), reqParams.Email)
 	if err != nil {
-		respondWithError(w, 500, "Error creating user", err)
+		respondWithError(w, http.StatusInternalServerError, "Error creating user", err)
 		return
 	}
 
@@ -54,7 +54,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	// respond with HTTP Created (201) success and the new user data
 	err = respondWithJSON(w, http.StatusCreated, newUser)
 	if err != nil {
-		respondWithError(w, 500, "Server error occurred", err)
+		respondWithError(w, http.StatusInternalServerError, "Server error occurred", err)
 		return
 	}
 }

@@ -52,7 +52,7 @@ func (cfg *apiConfig) handlerResetEndpoint(w http.ResponseWriter, r *http.Reques
 	cfg.fileserverHits.Swap(0)
 	err := cfg.db.ResetUsers(r.Context())
 	if err != nil {
-		respondWithError(w, 500, "Error resetting users", err)
+		respondWithError(w, http.StatusInternalServerError, "Error resetting users", err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -113,7 +113,7 @@ func main() {
 	httpReqRouter.HandleFunc("GET /api/healthz", handlerReadinessEndpoint)                // only accepts GET requests, server should return 405 (method not allowed) response automatically if other method used
 	httpReqRouter.HandleFunc("GET /admin/metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // only accepts GET requests
 	httpReqRouter.HandleFunc("POST /admin/reset", apiCfg.handlerResetEndpoint)            // only accepts POST requests
-	httpReqRouter.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	httpReqRouter.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
 	httpReqRouter.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
 	// create http server
