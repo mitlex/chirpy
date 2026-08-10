@@ -16,7 +16,8 @@ import (
 // apiConfig will hold any stateful in-memory data that needs tracking
 type apiConfig struct {
 	fileserverHits atomic.Int32      // tracks how many requests are made to our website - this type allows safe incrementing and reading of an integer value across multiple goroutines (HTTP requests)
-	queries        *database.Queries // to give handlers access to database queries
+	db             *database.Queries // to give handlers access to database queries
+	platform       string            // to represent environment name for purposes such as restricting handlers to execute only in certain environments
 }
 
 // middlewareMetricsInc increments the fileserverHits counter every time middlewareMetricsInc is called
@@ -42,9 +43,18 @@ func (cfg *apiConfig) handlerDisplaySiteHitsEndpoint(w http.ResponseWriter, r *h
 	w.Write([]byte(hits))
 }
 
-// handlerResetSiteHits resets the fileserverHits back to 0
-func (cfg *apiConfig) handlerResetSiteHitsEndpoint(w http.ResponseWriter, r *http.Request) {
+// handlerResetEndpoint resets the fileserverHits back to 0 and deletes all users from the database
+func (cfg *apiConfig) handlerResetEndpoint(w http.ResponseWriter, r *http.Request) {
+	if cfg.platform != "dev" {
+		respondWithError(w, http.StatusForbidden, "forbidden request", nil)
+		return
+	}
 	cfg.fileserverHits.Swap(0)
+	err := cfg.db.ResetUsers(r.Context())
+	if err != nil {
+		respondWithError(w, 500, "Error resetting users", err)
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 }
@@ -60,14 +70,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dbQueries := database.New(db)
+	dbQueries := database.New(db) // use SQLC generated database package to create a new *database.Queries
 
 	httpReqRouter := http.NewServeMux() // Create new http.ServeMux to route requests
 
 	// Instantiate apiConfig for stateful data tracking
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
-		queries:        dbQueries,
+		db:             dbQueries,
+		platform:       os.Getenv("PLATFORM"),
 	}
 
 	// Register handlers for requests
@@ -101,8 +112,9 @@ func main() {
 	// Notice how we register this pattern using HandleFunc instead of Handle - look at the parameter types that Handle accepts vs. HandleFunc
 	httpReqRouter.HandleFunc("GET /api/healthz", handlerReadinessEndpoint)                // only accepts GET requests, server should return 405 (method not allowed) response automatically if other method used
 	httpReqRouter.HandleFunc("GET /admin/metrics", apiCfg.handlerDisplaySiteHitsEndpoint) // only accepts GET requests
-	httpReqRouter.HandleFunc("POST /admin/reset", apiCfg.handlerResetSiteHitsEndpoint)    // only accepts POST requests
-	httpReqRouter.HandleFunc("POST /api/validate_chirp", handlerValidateChirpEndpoint)
+	httpReqRouter.HandleFunc("POST /admin/reset", apiCfg.handlerResetEndpoint)            // only accepts POST requests
+	httpReqRouter.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	httpReqRouter.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
 	// create http server
 	srv := &http.Server{

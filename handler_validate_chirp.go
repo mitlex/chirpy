@@ -6,8 +6,9 @@ import (
 	"strings"
 )
 
-// handlerValidateChirpEndpoint
-func handlerValidateChirpEndpoint(w http.ResponseWriter, r *http.Request) {
+// handlerValidateChirp takes a chirp from a JSON formatted request body and validates it
+// profanity is removed from the validated chirp before this handler responds with success and the cleaned chirp in a JSON payload
+func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	type parameters struct {
 		Body string `json:"body"`
