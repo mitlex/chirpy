@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/mitlex/chirpy/internal/auth"
 	"github.com/mitlex/chirpy/internal/database"
 )
 
@@ -19,12 +20,13 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
-// handlerCreateUser takes a JSON body containing an email address from the request
+// handlerCreateUser takes a JSON body containing an email address and password from the HTTP request
 // It creates a new user in the Chirpy database and if successful responds with a 201 (Created) response with the new User data in a JSON format
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	type reqParameters struct {
-		Email string `json:"email"`
+		Password string `json:"password"` // as long as server uses HTTPS in prod, it's safe to send raw passwords in HTTP requests, because the entire request is encrypted
+		Email    string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -35,9 +37,24 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Create new database user with request provided email
-	var newDbUser database.User
-	newDbUser, err = cfg.db.CreateUser(r.Context(), reqParams.Email)
+	// reject empty string passwords (we're not enforcing any password rules in this project but we will at least enforce some form of password)
+	if reqParams.Password == "" {
+		respondWithError(w, http.StatusBadRequest, "Password not provided", nil)
+		return
+	}
+
+	// Hash the provided password before storing in database
+	hashedPassword, err := auth.HashPassword(reqParams.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	// Create new database user with request provided email and newly hashed password
+	newDbUser, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{
+		Email:          reqParams.Email,
+		HashedPassword: hashedPassword,
+	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error creating user", err)
 		return
@@ -49,6 +66,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 		CreatedAt: newDbUser.CreatedAt,
 		UpdatedAt: newDbUser.UpdatedAt,
 		Email:     newDbUser.Email,
+		// Omit the hashed password in response for security purposes
 	}
 
 	// respond with HTTP Created (201) success and the new user data
