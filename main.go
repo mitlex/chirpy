@@ -115,6 +115,7 @@ func main() {
 	httpReqRouter.HandleFunc("POST /admin/reset", apiCfg.handlerResetEndpoint)            // only accepts POST requests
 	httpReqRouter.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
 	httpReqRouter.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
+	httpReqRouter.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerGetChirp)
 	httpReqRouter.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
 	// create http server
