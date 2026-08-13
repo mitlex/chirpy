@@ -55,3 +55,6 @@ test.http
 # Application runtime logs or crash dumps
 *.log
 *.crash
+
+# JWT notes for learning purposes
+jwt_notes.md
