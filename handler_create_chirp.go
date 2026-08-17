@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mitlex/chirpy/internal/auth"
 	"github.com/mitlex/chirpy/internal/database"
 )
 
@@ -20,36 +21,50 @@ type Chirp struct {
 
 // handlerCreateChirp takes a chirp and user id from a JSON formatted request body, validates the chirp, and removes profanity from it
 // If the chirp is valid, it is saved to the chirpy database
-// Upon successful record creation, record is marshalled into a JSON object and a HTTP 201 Created response is given
+// Upon successful record creation, record is marshalled into a JSON object and an HTTP 201 Created response is given
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+		// User ID comes from the validated JWT (not the request body) to prevent clients from
+		// impersonating other users by supplying an arbitrary user_id in the JSON payload
+	}
+
+	// Validate user JWT before creating Chirp
+	userJWT, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "unauthorized request", err)
+		return
+	}
+
+	userId, err := auth.ValidateJWT(userJWT, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token", err)
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params) // any missing fields in the request body JSON will have their struct values set to their zero value
-	if err != nil {                // error usually occurs due to JSON having wrong types or being invalid
+	err = decoder.Decode(&params) // any missing fields in the request body JSON will have their struct values set to their zero value
+	if err != nil {               // error usually occurs due to JSON having wrong types or being invalid
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
 
-	// check if Chirp is longer than 140 chars
-	// assume that we are only handling ASCII chars (where 1 char = 1 byte)
+	// Check if Chirp is longer than 140 chars
+	// Assume that we are only handling ASCII chars (where 1 char = 1 byte)
 	if len(params.Body) > 140 {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
 		return
 	}
 
-	// apply profanity filter to chirp
+	// Apply profanity filter to chirp
 	params.Body = profanityFilter(params.Body)
 
-	// save the chirp to the database
+	// Save the chirp to the database
 	dbChirpParams := database.CreateChirpParams{
 		Body:   params.Body,
-		UserID: params.UserID,
+		UserID: userId,
 	}
 	var dbChirp database.Chirp
 	dbChirp, err = cfg.db.CreateChirp(r.Context(), dbChirpParams)
@@ -58,7 +73,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// load new chirp db record into Chirp struct instance for marshalling with fixed JSON tags (see Chirp struct)
+	// Load new chirp db record into Chirp struct instance for marshalling with fixed JSON tags (see Chirp struct)
 	chirp := Chirp{
 		ID:        dbChirp.ID,
 		CreatedAt: dbChirp.CreatedAt,
@@ -67,7 +82,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		UserID:    dbChirp.UserID,
 	}
 
-	// respond with chirp and 201 Creation success
+	// Respond with chirp and 201 Creation success
 	err = respondWithJSON(w, http.StatusCreated, chirp)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Server error occurred", err)

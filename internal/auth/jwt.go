@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"errors"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -74,4 +77,25 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	}
 
 	return userID, nil
+}
+
+// GetBearerToken looks for auth info in the Authorization header sent with a request
+// Returns the TOKEN_STRING from the headers parameter if it exists (stripping off BEARER prefix and whitespace)
+// NOTE: Authorization header value looks like "BEARER TOKEN_STRING"
+func GetBearerToken(headers http.Header) (string, error) {
+	// Get the Authorization header value
+	authVal := headers.Get("Authorization")
+	if authVal == "" {
+		return "", errors.New("Authorization header has no value or does not exist")
+	}
+
+	// Check for malformed Authorization header
+	if !strings.HasPrefix(authVal, "Bearer ") {
+		return "", errors.New("Malformed Authorization header, expecting 'Bearer ' prefix")
+	}
+
+	// Trim off "Bearer "
+	authValTrimmed := strings.TrimPrefix(authVal, "Bearer ")
+
+	return authValTrimmed, nil
 }

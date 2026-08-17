@@ -18,6 +18,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32      // tracks how many requests are made to our website - this type allows safe incrementing and reading of an integer value across multiple goroutines (HTTP requests)
 	db             *database.Queries // to give handlers access to database queries
 	platform       string            // to represent environment name for purposes such as restricting handlers to execute only in certain environments
+	jwtSecret      string            // used for signing and validating JSON Web Tokens
 }
 
 // middlewareMetricsInc increments the fileserverHits counter every time middlewareMetricsInc is called
@@ -79,6 +80,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
 		platform:       os.Getenv("PLATFORM"),
+		jwtSecret:      os.Getenv("JWT_SECRET"),
 	}
 
 	// Register handlers for requests
