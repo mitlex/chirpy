@@ -81,7 +81,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 
 // GetBearerToken looks for auth info in the Authorization header sent with a request
 // Returns the TOKEN_STRING from the headers parameter if it exists (stripping off BEARER prefix and whitespace)
-// NOTE: Authorization header value looks like "BEARER TOKEN_STRING"
+// NOTE: Authorization header value looks like "BEARER TOKEN_STRING" - TOKEN_STRING can be a JWT string or a refresh token string
 func GetBearerToken(headers http.Header) (string, error) {
 	// Get the Authorization header value
 	authVal := headers.Get("Authorization")

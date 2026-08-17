@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+
 	"github.com/alexedwards/argon2id"
 )
 
@@ -24,4 +27,11 @@ func CheckPasswordHash(password, hash string) (bool, error) {
 	}
 
 	return match, nil
+}
+
+// MakeRefreshToken generates and returns a random 256-bit (32-byte) hex-encoded string
+func MakeRefreshToken() string {
+	bytes := make([]byte, 32)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
 }

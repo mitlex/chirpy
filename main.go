@@ -120,6 +120,8 @@ func main() {
 	httpReqRouter.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerGetChirp)
 	httpReqRouter.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	httpReqRouter.HandleFunc("POST /api/login", apiCfg.handlerLoginUser)
+	httpReqRouter.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
+	httpReqRouter.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
 
 	// create http server
 	srv := &http.Server{

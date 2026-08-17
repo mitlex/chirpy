@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mitlex/chirpy/internal/auth"
+	"github.com/mitlex/chirpy/internal/database"
 )
 
 // handlerLoginUser takes a JSON body containing an email address and password from the HTTP request
@@ -20,14 +21,14 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	// shape the API contract specifies.
 	type response struct {
 		User
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	defer r.Body.Close()
 	type reqParameters struct {
-		Password         string `json:"password"` // as long as server uses HTTPS in prod, it's safe to send raw passwords in HTTP requests, because the entire request is encrypted
-		Email            string `json:"email"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"` // not time.Duration since we want to accept times in seconds, not nanoseconds, we'll handle time.Duration manipulation with the provided integer
+		Password string `json:"password"` // as long as server uses HTTPS in prod, it's safe to send raw passwords in HTTP requests, because the entire request is encrypted
+		Email    string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -38,20 +39,14 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine JWT expiration: defaults to 1hr if unset, maximum 1hr
-	expiresIn := time.Duration(reqParams.ExpiresInSeconds) * time.Second
-	if expiresIn <= 0 || expiresIn > time.Hour {
-		expiresIn = time.Hour
-	}
-
-	// get user from database by provided email address
+	// Get user from database by provided email address
 	dbUser, err := cfg.db.GetUserByEmail(r.Context(), reqParams.Email)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err) // do NOT leak that the email exists - good security practice
 		return
 	}
 
-	// check password matches hashed password for this user
+	// Check password matches hashed password for this user
 	match, err := auth.CheckPasswordHash(reqParams.Password, dbUser.HashedPassword)
 	if err != nil || !match {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
@@ -66,16 +61,30 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 		// Omit the hashed password in response for security purposes
 	}
 
-	// create JWT for user and assign it to response
-	userJwt, err := auth.MakeJWT(loggedInUser.ID, cfg.jwtSecret, expiresIn)
+	// Create user JWT
+	userJwt, err := auth.MakeJWT(loggedInUser.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Server error occurred", err)
 		return
 	}
 
+	// Store refresh token in chirpy database
+	userRefreshTokenDb, err := cfg.db.CreateRefreshToken(r.Context(),
+		database.CreateRefreshTokenParams{
+			Token:     auth.MakeRefreshToken(),
+			UserID:    dbUser.ID,
+			ExpiresAt: time.Now().UTC().Add(60 * 24 * time.Hour), // 60 days
+		})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Server error occurred", err)
+		return
+	}
+
+	// Create response payload
 	resp := response{
-		User:  loggedInUser,
-		Token: userJwt,
+		User:         loggedInUser,
+		Token:        userJwt,
+		RefreshToken: userRefreshTokenDb.Token,
 	}
 
 	err = respondWithJSON(w, http.StatusOK, resp)
