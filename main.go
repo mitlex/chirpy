@@ -122,6 +122,7 @@ func main() {
 	httpReqRouter.HandleFunc("POST /api/login", apiCfg.handlerLoginUser)
 	httpReqRouter.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
 	httpReqRouter.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
+	httpReqRouter.HandleFunc("PUT /api/users", apiCfg.handlerUpdateEmailAndPassword)
 
 	// create http server
 	srv := &http.Server{

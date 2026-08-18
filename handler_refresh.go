@@ -15,7 +15,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 	// Get the refresh token from the HTTP request header
 	refreshToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Error retrieving token from request header", err)
+		respondWithError(w, http.StatusUnauthorized, "unauthorized request", err)
 		return
 	}
 
