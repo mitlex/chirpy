@@ -14,10 +14,11 @@ import (
 // When the database package returns a database.User (from our CreateUser query) we will map it to this struct
 // This gives us control over the JSON tags when we marshal the struct to JSON (as opposed to having the Go config option 'emit_json_tags' automatically create the tags)
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 // handlerCreateUser takes a JSON body containing an email address and password from the HTTP request
@@ -62,10 +63,11 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 
 	// map new database user record to a User struct before marshalling and responding (for JSON tag control purposes - see User struct definition commentary)
 	newUser := User{
-		ID:        newDbUser.ID,
-		CreatedAt: newDbUser.CreatedAt,
-		UpdatedAt: newDbUser.UpdatedAt,
-		Email:     newDbUser.Email,
+		ID:          newDbUser.ID,
+		CreatedAt:   newDbUser.CreatedAt,
+		UpdatedAt:   newDbUser.UpdatedAt,
+		Email:       newDbUser.Email,
+		IsChirpyRed: newDbUser.IsChirpyRed,
 		// Omit the hashed password in response for security purposes
 	}
 

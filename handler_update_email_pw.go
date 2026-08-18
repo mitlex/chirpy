@@ -66,10 +66,11 @@ func (cfg *apiConfig) handlerUpdateEmailAndPassword(w http.ResponseWriter, r *ht
 	}
 
 	resp := User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-		Email:     dbUser.Email,
+		ID:          dbUser.ID,
+		CreatedAt:   dbUser.CreatedAt,
+		UpdatedAt:   dbUser.UpdatedAt,
+		Email:       dbUser.Email,
+		IsChirpyRed: dbUser.IsChirpyRed,
 	}
 
 	// Respond with updated details (except password, of course)

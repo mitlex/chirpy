@@ -124,6 +124,7 @@ func main() {
 	httpReqRouter.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
 	httpReqRouter.HandleFunc("PUT /api/users", apiCfg.handlerUpdateEmailAndPassword)
 	httpReqRouter.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handlerDeleteChirp)
+	httpReqRouter.HandleFunc("POST /api/polka/webhooks", apiCfg.handlerUpgradeUserToChirpyRed)
 
 	// create http server
 	srv := &http.Server{
