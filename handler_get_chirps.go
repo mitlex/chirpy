@@ -3,24 +3,45 @@ package main
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/mitlex/chirpy/internal/database"
 )
 
 // handlerGetChirps retrieves all chirps stored in the Chirpy database and responds with them in a JSON object ordered by chirpy created_at field ascending
+// If the optional query parameter 'author_id' is provided, only chirps created by that author are returned in the response
+// NOTE:
+//
+//	When searching for multiple rows in a db, db drivers typically return an empty slice [] rather than sql.ErrNoRows if no matching rows exist (unlike single-row queries)
+//	Returning an empty list with 200 OK is standard REST behaviour for a list endpoint when no matching items are found
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	// get chirps from database
-	dbChirps, err := cfg.db.GetChirps(r.Context())
+	// Determine if optional 'author_id' query parameter was provided in request
+	authorID := r.URL.Query().Get("author_id")
+
+	var dbChirps []database.Chirp
+	var err error
+
+	if authorID == "" { // Get all chirps from database
+		dbChirps, err = cfg.db.GetChirps(r.Context())
+	} else { // Only get chirps for given author
+		authorUUID, err := uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "invalid author_id", err)
+			return
+		}
+		dbChirps, err = cfg.db.GetChirpsByAuthor(r.Context(), authorUUID)
+	}
+
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error getting chirps", err)
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
 
-	// load database chirps into []Chirp with json tags
+	// Load database chirps into []Chirp with json tags
 	chirps := convertDbChirpsToChirpStructs(dbChirps)
 
-	// respond with chirps and 200 status OK
+	// Respond with chirps and 200 status OK
 	err = respondWithJSON(w, http.StatusOK, chirps)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Server error occurred", err)
