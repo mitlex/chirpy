@@ -2,14 +2,18 @@ package main
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/mitlex/chirpy/internal/database"
 )
 
-// handlerGetChirps retrieves all chirps stored in the Chirpy database and responds with them in a JSON object ordered by chirpy created_at field ascending
+// handlerGetChirps retrieves chirps stored in the Chirpy database and responds with them in a JSON object ordered by chirpy created_at field ascending
+// If the optional query parameter 'sort=desc' is provided, chirps are sorted in descending order of their created_at datetime
+//
+//	If 'sort=asc' the function will retain its default ascending sorting behaviour
+//
 // If the optional query parameter 'author_id' is provided, only chirps created by that author are returned in the response
-// NOTE:
 //
 //	When searching for multiple rows in a db, db drivers typically return an empty slice [] rather than sql.ErrNoRows if no matching rows exist (unlike single-row queries)
 //	Returning an empty list with 200 OK is standard REST behaviour for a list endpoint when no matching items are found
@@ -36,6 +40,15 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
+	}
+
+	// Sort chirps in descending order of created_at if 'sort=desc'
+	// I.e. newest chirps will show first
+	sortOrder := r.URL.Query().Get("sort")
+	if sortOrder == "desc" {
+		sort.Slice(dbChirps, func(i, j int) bool {
+			return dbChirps[i].CreatedAt.After(dbChirps[j].CreatedAt)
+		})
 	}
 
 	// Load database chirps into []Chirp with json tags
