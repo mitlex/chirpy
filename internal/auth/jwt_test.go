@@ -72,44 +72,66 @@ func TestJWT(t *testing.T) {
 
 func TestGetBearerToken(t *testing.T) {
 	cases := []struct {
-		name   string
-		Header http.Header
+		name          string
+		header        http.Header
+		expectedToken string
+		expectError   bool
 	}{
 		{
-			name:   "Authorization header exists with correct form",
-			Header: http.Header{"Authorization": []string{"Bearer testing"}},
+			name:          "Valid token",
+			header:        http.Header{"Authorization": []string{"Bearer testing"}},
+			expectedToken: "testing",
+			expectError:   false,
 		},
 		{
-			name:   "Authorization header exists with incorrect form",
-			Header: http.Header{"Authorization": []string{"malformed header"}},
+			name:          "Valid token with extra whitespace",
+			header:        http.Header{"Authorization": []string{"Bearer   testing  "}},
+			expectedToken: "testing",
+			expectError:   false,
 		},
 		{
-			name:   "Authorization header is empty",
-			Header: http.Header{"Authorization": []string{""}},
+			name:          "Malformed header without Bearer prefix",
+			header:        http.Header{"Authorization": []string{"malformed header"}},
+			expectedToken: "",
+			expectError:   true,
 		},
 		{
-			name:   "Authorization header doesn't exist in header",
-			Header: http.Header{},
+			name:          "Empty header string",
+			header:        http.Header{"Authorization": []string{""}},
+			expectedToken: "",
+			expectError:   true,
+		},
+		{
+			name:          "Missing Authorization header",
+			header:        http.Header{},
+			expectedToken: "",
+			expectError:   true,
+		},
+		{
+			name:          "Wrong scheme (ApiKey instead of Bearer)",
+			header:        http.Header{"Authorization": []string{"ApiKey some-token"}},
+			expectedToken: "",
+			expectError:   true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			token, err := GetBearerToken(c.header)
 
-			if c.Header.Get("Authorization") == "Bearer testing" {
-				tokenString, err := GetBearerToken(c.Header)
-				if err != nil {
-					t.Fatalf("error: could not get token: %v", err)
-				}
-
-				if tokenString != "testing" {
-					t.Fatal("error: Authorization header prefix stripping failed")
-				}
-			} else {
-				_, err := GetBearerToken(c.Header)
+			if c.expectError {
 				if err == nil {
-					t.Fatalf("error: invalid Authorization header passed test: %v", err)
+					t.Fatalf("expected an error, but got nil")
 				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if token != c.expectedToken {
+				t.Fatalf("expected token %q, got %q", c.expectedToken, token)
 			}
 		})
 	}

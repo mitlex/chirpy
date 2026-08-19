@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/mitlex/chirpy/internal/auth"
 )
 
 // handlerUpgradeUserToChirpyRed marks a Chirpy user as a Chirpy Red member when Polka (our pretend payment provider) sends us a webhook saying the user subscribed to Chirpy Red
@@ -24,6 +25,17 @@ func (cfg *apiConfig) handlerUpgradeUserToChirpyRed(w http.ResponseWriter, r *ht
 	err := decoder.Decode(&reqParams) // any missing fields in the request body JSON will have their struct values set to their zero value
 	if err != nil {                   // error usually occurs due to JSON having wrong types or being invalid
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	// Ensure the webhook came from Polka by checking API key stored in Authorization header
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "unauthorized request", err)
+		return
+	}
+	if apiKey != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "unauthorized request", err)
 		return
 	}
 

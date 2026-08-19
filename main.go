@@ -19,6 +19,7 @@ type apiConfig struct {
 	db             *database.Queries // to give handlers access to database queries
 	platform       string            // to represent environment name for purposes such as restricting handlers to execute only in certain environments
 	jwtSecret      string            // used for signing and validating JSON Web Tokens
+	polkaKey       string            // Polka API Key - Polka will send this with each Chirpy Red subscription webhook to prove the webhook is coming from Polka and not someone trying to get a free Chirpy Red subscription
 }
 
 // middlewareMetricsInc increments the fileserverHits counter every time middlewareMetricsInc is called
@@ -81,6 +82,7 @@ func main() {
 		db:             dbQueries,
 		platform:       os.Getenv("PLATFORM"),
 		jwtSecret:      os.Getenv("JWT_SECRET"),
+		polkaKey:       os.Getenv("POLKA_KEY"),
 	}
 
 	// Register handlers for requests

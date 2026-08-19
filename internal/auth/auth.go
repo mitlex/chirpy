@@ -3,6 +3,9 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"net/http"
+	"strings"
 
 	"github.com/alexedwards/argon2id"
 )
@@ -34,4 +37,24 @@ func MakeRefreshToken() string {
 	bytes := make([]byte, 32)
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
+}
+
+// GetAPIKey extracts the API key from the Authorization header in an HTTP request
+// This comes in the format Authorization: ApiKey THE_KEY_HERE
+// We strip "ApiKey " and any whitespace and return only the key string
+func GetAPIKey(headers http.Header) (string, error) {
+	authVal := headers.Get("Authorization")
+	if authVal == "" {
+		return "", errors.New("Authorization header has no value or does not exist")
+	}
+
+	// Check for malformed Authorization header
+	if !strings.HasPrefix(authVal, "ApiKey ") {
+		return "", errors.New("Malformed Authorization header, expecting 'ApiKey ' prefix")
+	}
+
+	// Trim off "ApiKey "
+	apiKey := strings.TrimSpace(strings.TrimPrefix(authVal, "ApiKey "))
+
+	return apiKey, nil
 }

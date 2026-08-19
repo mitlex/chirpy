@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
 )
 
@@ -71,5 +72,72 @@ func TestCheckPasswordHashMalformedHash(t *testing.T) {
 	_, err := CheckPasswordHash("easypassword", "IAmAMalformedInvalidHash") // the hash value is not a valid encoded Argon2id hash
 	if err == nil {                                                         // therefore we do expect an error to return from CheckPasswordHash
 		t.Fatal("malformed hash should cause CheckPasswordHash to return an error")
+	}
+}
+
+func TestGetAPIKey(t *testing.T) {
+	cases := []struct {
+		name        string
+		header      http.Header
+		expectedKey string
+		expectError bool
+	}{
+		{
+			name:        "Valid key",
+			header:      http.Header{"Authorization": []string{"ApiKey testing"}},
+			expectedKey: "testing",
+			expectError: false,
+		},
+		{
+			name:        "Valid key with extra whitespace",
+			header:      http.Header{"Authorization": []string{"ApiKey   testing  "}},
+			expectedKey: "testing",
+			expectError: false,
+		},
+		{
+			name:        "Malformed header without ApiKey prefix",
+			header:      http.Header{"Authorization": []string{"malformed header"}},
+			expectedKey: "",
+			expectError: true,
+		},
+		{
+			name:        "Empty header string",
+			header:      http.Header{"Authorization": []string{""}},
+			expectedKey: "",
+			expectError: true,
+		},
+		{
+			name:        "Missing Authorization header",
+			header:      http.Header{},
+			expectedKey: "",
+			expectError: true,
+		},
+		{
+			name:        "Wrong scheme (Bearer instead of ApiKey)",
+			header:      http.Header{"Authorization": []string{"Bearer some-token"}},
+			expectedKey: "",
+			expectError: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			key, err := GetAPIKey(c.header)
+
+			if c.expectError {
+				if err == nil {
+					t.Fatalf("expected an error, but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if key != c.expectedKey {
+				t.Fatalf("expected key %q, got %q", c.expectedKey, key)
+			}
+		})
 	}
 }

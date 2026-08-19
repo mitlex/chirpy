@@ -95,7 +95,7 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	// Trim off "Bearer "
-	authValTrimmed := strings.TrimPrefix(authVal, "Bearer ")
+	authValTrimmed := strings.TrimSpace(strings.TrimPrefix(authVal, "Bearer "))
 
 	return authValTrimmed, nil
 }
