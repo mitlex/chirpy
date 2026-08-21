@@ -24,7 +24,7 @@ func (cfg *apiConfig) handlerUpgradeUserToChirpyRed(w http.ResponseWriter, r *ht
 	reqParams := reqParameters{}
 	err := decoder.Decode(&reqParams) // any missing fields in the request body JSON will have their struct values set to their zero value
 	if err != nil {                   // error usually occurs due to JSON having wrong types or being invalid
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON", err)
 		return
 	}
 
